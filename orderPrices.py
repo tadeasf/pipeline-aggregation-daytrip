@@ -1,19 +1,11 @@
 def pipeline():
     return [
-        {"$sort": {"createdAt": int(1)}},
-        {"$limit": int(2000)},
-        {"$addFields": {"order": "$$ROOT"}},
-        {
-            "$addFields": {
-                "passengersCount": {"$size": "$passengers"},
-                "vehiclesCount": {"$size": "$vehicles"},
-                "additionalStopCount": {"$size": "$customLocations"},
-            }
-        },
+        {"$sort": {"createdAt": 1}},
+        {"$limit": 2000},
         {
             "$lookup": {
                 "from": "discounts",
-                "localField": "order.discountIds",
+                "localField": "discountIds",
                 "foreignField": "_id",
                 "as": "discounts",
             }
@@ -43,73 +35,6 @@ def pipeline():
             }
         },
         {
-            "$addFields": {
-                "sumOfChargebacks": {
-                    "$reduce": {
-                        "input": "$chargebacks",
-                        "initialValue": 0.0,
-                        "in": {"$add": ["$$value", "$$this.amount"]},
-                    }
-                }
-            }
-        },
-        {
-            "$lookup": {
-                "from": "payments",
-                "let": {"paymentId": "$_id"},
-                "pipeline": [
-                    {
-                        "$match": {
-                            "$and": [
-                                {"$expr": {"$eq": ["$orderId", "$$paymentId"]}},
-                                {"fulfilledAt": {"$ne": None}},
-                                {"failedAt": {"$eq": None}},
-                                {"chargedBackAt": {"$eq": None}},
-                            ]
-                        }
-                    }
-                ],
-                "as": "payments",
-            }
-        },
-        {
-            "$addFields": {
-                "payments": {
-                    "$cond": {
-                        "if": {"$gt": [{"$size": "$payments"}, 0.0]},
-                        "then": {"$arrayElemAt": ["$payments", 0.0]},
-                        "else": None,
-                    }
-                }
-            }
-        },
-        {"$unwind": {"path": "$payments", "preserveNullAndEmptyArrays": True}},
-        {"$addFields": {"paymentType": "$payments.type"}},
-        {
-            "$unwind": {
-                "path": "$originLocationCollection",
-                "preserveNullAndEmptyArrays": True,
-            }
-        },
-        {
-            "$unwind": {
-                "path": "$destinationLocationCollection",
-                "preserveNullAndEmptyArrays": True,
-            }
-        },
-        {
-            "$unwind": {
-                "path": "$originLocationCollection.countryId",
-                "preserveNullAndEmptyArrays": True,
-            }
-        },
-        {
-            "$unwind": {
-                "path": "$destinationLocationCollection.countryId",
-                "preserveNullAndEmptyArrays": True,
-            }
-        },
-        {
             "$lookup": {
                 "from": "countries",
                 "localField": "originLocationCollection.countryId",
@@ -126,70 +51,6 @@ def pipeline():
             }
         },
         {
-            "$unwind": {
-                "path": "$destinationCountryCollection",
-                "preserveNullAndEmptyArrays": True,
-            }
-        },
-        {
-            "$unwind": {
-                "path": "$originCountryCollection",
-                "preserveNullAndEmptyArrays": True,
-            }
-        },
-        {
-            "$lookup": {
-                "from": "assignations",
-                "localField": "_id",
-                "foreignField": "orderId",
-                "as": "assignationsubs",
-            }
-        },
-        {
-            "$lookup": {
-                "from": "subsidies",
-                "localField": "assignationsubs.subsidyIds",
-                "foreignField": "_id",
-                "as": "subsidies",
-            }
-        },
-        {
-            "$lookup": {
-                "from": "locations",
-                "localField": "originLocationId",
-                "foreignField": "_id",
-                "as": "originLocationLookup",
-            }
-        },
-        {
-            "$lookup": {
-                "from": "locations",
-                "localField": "destinationLocationId",
-                "foreignField": "_id",
-                "as": "destinationLocationLookup",
-            }
-        },
-        {"$unwind": {"path": "$originLocationLookup"}},
-        {"$unwind": {"path": "$originLocationLookup.name"}},
-        {"$unwind": {"path": "$destinationLocationLookup"}},
-        {"$unwind": {"path": "$destinationLocationLookup.name"}},
-        {
-            "$lookup": {
-                "from": "assignations",
-                "localField": "_id",
-                "foreignField": "orderId",
-                "as": "assignation",
-            }
-        },
-        {
-            "$lookup": {
-                "from": "users",
-                "localField": "assignation.userId",
-                "foreignField": "_id",
-                "as": "drivers",
-            }
-        },
-        {
             "$lookup": {
                 "from": "customerFeedbacks",
                 "localField": "_id",
@@ -198,124 +59,11 @@ def pipeline():
             }
         },
         {
-            "$addFields": {
-                "driverRating": {"$avg": "$driverFeedback.textScore"},
-                "rating1": {
-                    "$size": {
-                        "$filter": {
-                            "input": {"$ifNull": ["$feedbacks", []]},
-                            "as": "feedback",
-                            "cond": {"$eq": ["$$feedback.textScore", int(1)]},
-                        }
-                    }
-                },
-                "rating2": {
-                    "$size": {
-                        "$filter": {
-                            "input": {"$ifNull": ["$feedbacks", []]},
-                            "as": "feedback",
-                            "cond": {"$eq": ["$$feedback.textScore", int(2)]},
-                        }
-                    }
-                },
-                "rating3": {
-                    "$size": {
-                        "$filter": {
-                            "input": {"$ifNull": ["$feedbacks", []]},
-                            "as": "feedback",
-                            "cond": {"$eq": ["$$feedback.textScore", int(3)]},
-                        }
-                    }
-                },
-                "rating4": {
-                    "$size": {
-                        "$filter": {
-                            "input": {"$ifNull": ["$feedbacks", []]},
-                            "as": "feedback",
-                            "cond": {"$eq": ["$$feedback.textScore", int(4)]},
-                        }
-                    }
-                },
-                "rating5": {
-                    "$size": {
-                        "$filter": {
-                            "input": {"$ifNull": ["$feedbacks", []]},
-                            "as": "feedback",
-                            "cond": {"$eq": ["$$feedback.textScore", int(5)]},
-                        }
-                    }
-                },
-            }
-        },
-        {
-            "$addFields": {
-                "vehiclesString": {"$toString": {"$arrayElemAt": ["$vehicles", 0.0]}}
-            }
-        },
-        {
-            "$addFields": {
-                "vehiclesString": {
-                    "$replaceAll": {
-                        "input": "$vehiclesString",
-                        "find": "0",
-                        "replacement": "sedan",
-                    }
-                }
-            }
-        },
-        {
-            "$addFields": {
-                "vehiclesString": {
-                    "$replaceAll": {
-                        "input": "$vehiclesString",
-                        "find": "1",
-                        "replacement": "mpv",
-                    }
-                }
-            }
-        },
-        {
-            "$addFields": {
-                "vehiclesString": {
-                    "$replaceAll": {
-                        "input": "$vehiclesString",
-                        "find": "2",
-                        "replacement": "van",
-                    }
-                }
-            }
-        },
-        {
-            "$addFields": {
-                "vehiclesString": {
-                    "$replaceAll": {
-                        "input": "$vehiclesString",
-                        "find": "3",
-                        "replacement": "luxury sedan",
-                    }
-                }
-            }
-        },
-        {
-            "$addFields": {
-                "vehiclesString": {
-                    "$replaceAll": {
-                        "input": "$vehiclesString",
-                        "find": "4",
-                        "replacement": "shuttle",
-                    }
-                }
-            }
-        },
-        {
-            "$addFields": {
-                "vehiclesString": {
-                    "$replaceAll": {
-                        "input": "$vehiclesString",
-                        "find": "100",
-                        "replacement": "sedan lite",
-                    }
-                }
+            "$lookup": {
+                "from": "users",
+                "localField": "assignation.userId",
+                "foreignField": "_id",
+                "as": "drivers",
             }
         },
         {
@@ -342,15 +90,164 @@ def pipeline():
                 "as": "driversVehiclesModelsMakes",
             }
         },
-        {"$unwind": {"path": "$requestHeader", "preserveNullAndEmptyArrays": True}},
         {
-            "$unwind": {
-                "path": "$requestHeader.client",
-                "preserveNullAndEmptyArrays": True,
+            "$lookup": {
+                "from": "countries",
+                "localField": "order.pricingCountryId",
+                "foreignField": "_id",
+                "as": "pricingCountry",
+            }
+        },
+        {
+            "$lookup": {
+                "from": "payments",
+                "let": {"paymentId": "$_id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$and": [
+                                {"$expr": {"$eq": ["$orderId", "$$paymentId"]}},
+                                {"fulfilledAt": {"$ne": None}},
+                                {"failedAt": {"$eq": None}},
+                                {"chargedBackAt": {"$eq": None}},
+                            ]
+                        }
+                    }
+                ],
+                "as": "payments",
+            }
+        },
+        {
+            "$lookup": {
+                "from": "payments",
+                "localField": "_id",
+                "foreignField": "orderId",
+                "as": "paymentsFull",
+            }
+        },
+        {
+            "$lookup": {
+                "from": "users",
+                "localField": "userId",
+                "foreignField": "_id",
+                "as": "userCollection",
+            }
+        },
+        {
+            "$lookup": {
+                "from": "assignations",
+                "localField": "_id",
+                "foreignField": "orderId",
+                "as": "assignation",
+            }
+        },
+        {
+            "$lookup": {
+                "from": "subsidies",
+                "localField": "assignation.subsidyIds",
+                "foreignField": "_id",
+                "as": "subsidies",
+            }
+        },
+        {
+            "$lookup": {
+                "from": "travelData",
+                "let": {
+                    "originLocationId": "$originLocationId",
+                    "destinationLocationId": "$destinationLocationId",
+                },
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$and": [
+                                    {"$eq": ["$originId", "$$originLocationId"]},
+                                    {
+                                        "$eq": [
+                                            "$destinationId",
+                                            "$$destinationLocationId",
+                                        ]
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "as": "matchedData",
+            }
+        },
+        {"$addFields": {"order": "$$ROOT"}},
+        {
+            "$addFields": {
+                "passengersCount": {"$size": "$passengers"},
+                "vehiclesCount": {"$size": "$vehicles"},
+                "additionalStopCount": {"$size": "$customLocations"},
+                "sumOfChargebacks": {
+                    "$reduce": {
+                        "input": "$chargebacks",
+                        "initialValue": 0.0,
+                        "in": {"$add": ["$$value", "$$this.amount"]},
+                    }
+                },
+                "payments": {
+                    "$cond": {
+                        "if": {"$gt": [{"$size": "$payments"}, 0.0]},
+                        "then": {"$arrayElemAt": ["$payments", 0.0]},
+                        "else": None,
+                    }
+                },
+                "driverRating": {"$avg": "$driverFeedback.textScore"},
+                "rating1": {
+                    "$size": {
+                        "$filter": {
+                            "input": {"$ifNull": ["$feedbacks", []]},
+                            "as": "feedback",
+                            "cond": {"$eq": ["$$feedback.textScore", 1]},
+                        }
+                    }
+                },
+                "rating2": {
+                    "$size": {
+                        "$filter": {
+                            "input": {"$ifNull": ["$feedbacks", []]},
+                            "as": "feedback",
+                            "cond": {"$eq": ["$$feedback.textScore", 2]},
+                        }
+                    }
+                },
+                "rating3": {
+                    "$size": {
+                        "$filter": {
+                            "input": {"$ifNull": ["$feedbacks", []]},
+                            "as": "feedback",
+                            "cond": {"$eq": ["$$feedback.textScore", 3]},
+                        }
+                    }
+                },
+                "rating4": {
+                    "$size": {
+                        "$filter": {
+                            "input": {"$ifNull": ["$feedbacks", []]},
+                            "as": "feedback",
+                            "cond": {"$eq": ["$$feedback.textScore", 4]},
+                        }
+                    }
+                },
+                "rating5": {
+                    "$size": {
+                        "$filter": {
+                            "input": {"$ifNull": ["$feedbacks", []]},
+                            "as": "feedback",
+                            "cond": {"$eq": ["$$feedback.textScore", 5]},
+                        }
+                    }
+                },
             }
         },
         {
             "$addFields": {
+                "paymentType": "$payments.type",
+                "vehiclesString": {"$toString": {"$arrayElemAt": ["$vehicles", 0.0]}},
                 "driverFirstName0": {"$arrayElemAt": ["$drivers.firstName", 0.0]},
                 "driverFirstName1": {"$arrayElemAt": ["$drivers.firstName", 1.0]},
                 "driverFirstName2": {"$arrayElemAt": ["$drivers.firstName", 2.0]},
@@ -387,30 +284,13 @@ def pipeline():
                 "vehicleMake2": {
                     "$arrayElemAt": ["$driversVehiclesModelsMakes.name", 2.0]
                 },
-            }
-        },
-        {
-            "$addFields": {
-                "driverName0": {
-                    "$concat": ["$driverFirstName0", " ", "$driverLastName0"]
-                },
-                "driverName1": {
-                    "$concat": ["$driverFirstName1", " ", "$driverLastName1"]
-                },
-                "driverName2": {
-                    "$concat": ["$driverFirstName2", " ", "$driverLastName2"]
-                },
-            }
-        },
-        {
-            "$addFields": {
                 "sumOfSubsidies": {
                     "$reduce": {
                         "input": "$subsidies",
                         "initialValue": 0.0,
                         "in": {"$sum": ["$$value", "$$this.value"]},
                     }
-                }
+                },
             }
         },
         {
@@ -906,95 +786,39 @@ def pipeline():
             }
         },
         {
-            "$lookup": {
-                "from": "countries",
-                "localField": "order.pricingCountryId",
-                "foreignField": "_id",
-                "as": "pricingCountry",
-            }
-        },
-        {"$unwind": {"path": "$pricingCountry", "preserveNullAndEmptyArrays": True}},
-        {
-            "$lookup": {
-                "from": "payments",
-                "localField": "_id",
-                "foreignField": "orderId",
-                "as": "payments2",
-            }
-        },
-        {
             "$addFields": {
                 "paymentFulfilledAt0": {
-                    "$arrayElemAt": ["$payments2.fulfilledAt", 0.0]
+                    "$arrayElemAt": ["$paymentsFull.fulfilledAt", 0.0]
                 },
                 "paymentFulfilledAt1": {
-                    "$arrayElemAt": ["$payments2.fulfilledAt", 1.0]
+                    "$arrayElemAt": ["$paymentsFull.fulfilledAt", 1.0]
                 },
                 "paymentFulfilledAt2": {
-                    "$arrayElemAt": ["$payments2.fulfilledAt", 2.0]
+                    "$arrayElemAt": ["$paymentsFull.fulfilledAt", 2.0]
                 },
                 "paymentFulfilledAt3": {
-                    "$arrayElemAt": ["$payments2.fulfilledAt", 3.0]
+                    "$arrayElemAt": ["$paymentsFull.fulfilledAt", 3.0]
                 },
-            }
-        },
-        {
-            "$addFields": {
-                "paymentFailedAt0": {"$arrayElemAt": ["$payments2.failedAt", 0.0]},
-                "paymentFailedAt1": {"$arrayElemAt": ["$payments2.failedAt", 1.0]},
-                "paymentFailedAt2": {"$arrayElemAt": ["$payments2.failedAt", 2.0]},
-                "paymentFailedAt3": {"$arrayElemAt": ["$payments2.failedAt", 3.0]},
-            }
-        },
-        {
-            "$addFields": {
+                "paymentFailedAt0": {"$arrayElemAt": ["$paymentsFull.failedAt", 0.0]},
+                "paymentFailedAt1": {"$arrayElemAt": ["$paymentsFull.failedAt", 1.0]},
+                "paymentFailedAt2": {"$arrayElemAt": ["$paymentsFull.failedAt", 2.0]},
+                "paymentFailedAt3": {"$arrayElemAt": ["$paymentsFull.failedAt", 3.0]},
                 "paymentChargedBackAt0": {
-                    "$arrayElemAt": ["$payments2.chargedBackAt", 0.0]
+                    "$arrayElemAt": ["$paymentsFull.chargedBackAt", 0.0]
                 },
                 "paymentChargedBackAt1": {
-                    "$arrayElemAt": ["$payments2.chargedBackAt", 1.0]
+                    "$arrayElemAt": ["$paymentsFull.chargedBackAt", 1.0]
                 },
                 "paymentChargedBackAt2": {
-                    "$arrayElemAt": ["$payments2.chargedBackAt", 2.0]
+                    "$arrayElemAt": ["$paymentsFull.chargedBackAt", 2.0]
                 },
                 "paymentChargedBackAt3": {
-                    "$arrayElemAt": ["$payments2.chargedBackAt", 3.0]
+                    "$arrayElemAt": ["$paymentsFull.chargedBackAt", 3.0]
                 },
-            }
-        },
-        {
-            "$addFields": {
-                "paymentAmount0": {"$arrayElemAt": ["$payments2.amount", 0.0]},
-                "paymentAmount1": {"$arrayElemAt": ["$payments2.amount", 1.0]},
-                "paymentAmount2": {"$arrayElemAt": ["$payments2.amount", 2.0]},
-                "paymentAmount3": {"$arrayElemAt": ["$payments2.amount", 3.0]},
-            }
-        },
-        {
-            "$lookup": {
-                "from": "travelData",
-                "let": {
-                    "originLocationId": "$originLocationId",
-                    "destinationLocationId": "$destinationLocationId",
-                },
-                "pipeline": [
-                    {
-                        "$match": {
-                            "$expr": {
-                                "$and": [
-                                    {"$eq": ["$originId", "$$originLocationId"]},
-                                    {
-                                        "$eq": [
-                                            "$destinationId",
-                                            "$$destinationLocationId",
-                                        ]
-                                    },
-                                ]
-                            }
-                        }
-                    }
-                ],
-                "as": "matchedData",
+                "paymentAmount0": {"$arrayElemAt": ["$paymentsFull.amount", 0.0]},
+                "paymentAmount1": {"$arrayElemAt": ["$paymentsFull.amount", 1.0]},
+                "paymentAmount2": {"$arrayElemAt": ["$paymentsFull.amount", 2.0]},
+                "paymentAmount3": {"$arrayElemAt": ["$paymentsFull.amount", 3.0]},
             }
         },
         {"$addFields": {"matchedDocument": {"$arrayElemAt": ["$matchedData", 0]}}},
@@ -1002,70 +826,168 @@ def pipeline():
             "$addFields": {
                 "travelDataDuration": "$matchedDocument.duration",
                 "travelDataDistance": "$matchedDocument.distance",
-            }
-        },
-        {
-            "$addFields": {
                 "customLocationsCount": {"$size": "$customLocations"},
                 "contentLocationsCount": {"$size": "$contentLocations"},
+                "totalStopsCount": {
+                    "$sum": ["$customLocationsCount", "$contentLocationsCount"]
+                },
+                "isLite": {"$in": [100, "$vehicles"]},
+            }
+        },
+        {"$unwind": {"path": "$payments", "preserveNullAndEmptyArrays": True}},
+        {
+            "$unwind": {
+                "path": "$originLocationCollection",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$destinationLocationCollection",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$originLocationCollection.countryId",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$destinationLocationCollection.countryId",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$destinationCountryCollection",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$originCountryCollection",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
+        {"$unwind": {"path": "$originLocationCollection"}},
+        {"$unwind": {"path": "$originLocationCollection.name"}},
+        {"$unwind": {"path": "$destinationLocationCollection"}},
+        {"$unwind": {"path": "$destinationLocationCollection.name"}},
+        {"$unwind": {"path": "$requestHeader", "preserveNullAndEmptyArrays": True}},
+        {
+            "$unwind": {
+                "path": "$requestHeader.client",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
+        {"$unwind": {"path": "$pricingCountry", "preserveNullAndEmptyArrays": True}},
+        {"$unwind": {"path": "$userCollection", "preserveNullAndEmptyArrays": True}},
+        {
+            "$unwind": {
+                "path": "$userCollection.travelAgent",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$userCollection.travelAgent.agentId",
+                "preserveNullAndEmptyArrays": True,
             }
         },
         {
             "$addFields": {
-                "totalStopsCount": {
-                    "$sum": ["$customLocationsCount", "$contentLocationsCount"]
+                "vehiclesString": {
+                    "$replaceAll": {
+                        "input": "$vehiclesString",
+                        "find": "0",
+                        "replacement": "sedan",
+                    }
                 }
             }
         },
         {
             "$addFields": {
+                "vehiclesString": {
+                    "$replaceAll": {
+                        "input": "$vehiclesString",
+                        "find": "1",
+                        "replacement": "mpv",
+                    }
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "vehiclesString": {
+                    "$replaceAll": {
+                        "input": "$vehiclesString",
+                        "find": "2",
+                        "replacement": "van",
+                    }
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "vehiclesString": {
+                    "$replaceAll": {
+                        "input": "$vehiclesString",
+                        "find": "3",
+                        "replacement": "luxury sedan",
+                    }
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "vehiclesString": {
+                    "$replaceAll": {
+                        "input": "$vehiclesString",
+                        "find": "4",
+                        "replacement": "shuttle",
+                    }
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "vehiclesString": {
+                    "$replaceAll": {
+                        "input": "$vehiclesString",
+                        "find": "100",
+                        "replacement": "sedan lite",
+                    }
+                }
+            }
+        },
+        {
+            "$addFields": {
+                "driverName0": {
+                    "$concat": ["$driverFirstName0", " ", "$driverLastName0"]
+                },
+                "driverName1": {
+                    "$concat": ["$driverFirstName1", " ", "$driverLastName1"]
+                },
+                "driverName2": {
+                    "$concat": ["$driverFirstName2", " ", "$driverLastName2"]
+                },
                 "hasAdditionalStop": {
                     "$cond": {
                         "if": {"$gte": ["$totalStopsCount", 1]},
                         "then": True,
                         "else": False,
                     }
-                }
+                },
+                "orderStatusString": {"$toString": "$status"},
+                "isPool": {"$toBool": "$type"},
+                "paymentMethodString": {"$toString": "$paymentMethod"},
+                "currencyString": {"$toString": "$pricingCurrency"},
             }
         },
-        {"$addFields": {"isLite": {"$in": [int(100), "$vehicles"]}}},
         {
-            "$project": {
-                "totalStopsCount": 1.0,
-                "totalPrice": "$totalPrice",
-                "isLite": 1.0,
-                "hasAdditionalStop": 1.0,
-                "travelDataDuration": 1.0,
-                "travelDataDistance": 1.0,
-                "passengersCount": 1.0,
-                "vehiclesCount": 1.0,
-                "additionalStopCount": 1.0,
-                "partnerId": 1.0,
-                "affiliatePartnerId": 1.0,
-                "rating1": 1.0,
-                "rating2": 1.0,
-                "rating3": 1.0,
-                "rating4": 1.0,
-                "rating5": 1.0,
-                "price": "$price",
-                "fee": "$fee",
-                "discountsPrice": {
-                    "$reduce": {
-                        "input": "$discounts",
-                        "initialValue": 0.0,
-                        "in": {"$sum": ["$$value", "$$this.price"]},
-                    }
-                },
-                "discountsFee": {
-                    "$reduce": {
-                        "input": "$discounts",
-                        "initialValue": 0.0,
-                        "in": {"$sum": ["$$value", "$$this.fee"]},
-                    }
-                },
-                "pricingCountryISOCode": {"$ifNull": ["$pricingCountry.isoCode", ""]},
-                "createdAt": "$createdAt",
-                "departureAt": "$departureAt",
+            "$addFields": {
                 "status": {
                     "$switch": {
                         "branches": [
@@ -1407,86 +1329,10 @@ def pipeline():
                         ],
                         "default": "not recognized",
                     }
-                },
-                "paymentMethod": "$paymentMethod",
-                "pricingCurrency": "$pricingCurrency",
-                "originCountry": "$originCountryCollection.englishName",
-                "destinationCountry": "$destinationCountryCollection.englishName",
-                "pricingCountryName": "$pricingCountry.englishName",
-                "currencyRate": 1.0,
-                "type": 1.0,
-                "userId": "$order.userId",
-                "sumOfSubsidies": 1.0,
-                "route": {
-                    "$concat": [
-                        "$originLocationLookup.name",
-                        " ",
-                        "$destinationLocationLookup.name",
-                    ]
-                },
-                "originLocation": "$originLocationLookup.name",
-                "destinationLocation": "$destinationLocationLookup.name",
-                "acceptedAt": 1.0,
-                "declinedAt": 1.0,
-                "confirmedAt": 1.0,
-                "cancelledAt": 1.0,
-                "paymentFulfilledAt0": 1.0,
-                "paymentFulfilledAt1": 1.0,
-                "paymentFulfilledAt2": 1.0,
-                "paymentFulfilledAt3": 1.0,
-                "paymentChargedBackAt0": 1.0,
-                "paymentChargedBackAt1": 1.0,
-                "paymentChargedBackAt2": 1.0,
-                "paymentChargedBackAt3": 1.0,
-                "paymentFailedAt0": 1.0,
-                "paymentFailedAt1": 1.0,
-                "paymentFailedAt2": 1.0,
-                "paymentFailedAt3": 1.0,
-                "paymentAmount0": 1.0,
-                "paymentAmount1": 1.0,
-                "paymentAmount2": 1.0,
-                "paymentAmount3": 1.0,
-                "isPaidOut": "$payments.isPaidOut",
-                "driverName0": 1.0,
-                "driverName1": 1.0,
-                "driverName2": 1.0,
-                "driver0Company": 1.0,
-                "driver1Company": 1.0,
-                "driver2Company": 1.0,
-                "routeId": 1.0,
-                "sumOfChargebacks": 1.0,
-                "vehicleYearOfManufacture0": 1.0,
-                "vehicleYearOfManufacture1": 1.0,
-                "vehicleYearOfManufacture2": 1.0,
-                "vehicleModel0": 1.0,
-                "vehicleModel1": 1.0,
-                "vehicleModel2": 1.0,
-                "vehicleMake0": 1.0,
-                "vehicleMake1": 1.0,
-                "vehicleMake2": 1.0,
-                "isBusinessTrip": 1.0,
-                "paymentType": 1.0,
-                "driverRating": 1.0,
-                "ipAddress": "$requestHeader.remoteAddress",
-                "userAgent": "$requestHeader.userAgent",
-                "requestHeaderClientName": "$requestHeader.client.name",
-                "vehicleType": "$vehiclesString",
-                "createdDepartureDiff": {
-                    "$divide": [
-                        {"$subtract": ["$departureAt", "$createdAt"]},
-                        86400000.0,
-                    ]
-                },
+                }
             }
         },
-        {
-            "$addFields": {
-                "orderStatusString": {"$toString": "$status"},
-                "isPool": {"$toBool": "$type"},
-                "paymentMethodString": {"$toString": "$paymentMethod"},
-                "currencyString": {"$toString": "$pricingCurrency"},
-            }
-        },
+        {"$addFields": {"orderStatusString": {"$toString": "$status"}}},
         {
             "$addFields": {
                 "orderStatusString": {
@@ -1620,27 +1466,6 @@ def pipeline():
             }
         },
         {
-            "$lookup": {
-                "from": "users",
-                "localField": "userId",
-                "foreignField": "_id",
-                "as": "userCollection",
-            }
-        },
-        {"$unwind": {"path": "$userCollection", "preserveNullAndEmptyArrays": True}},
-        {
-            "$unwind": {
-                "path": "$userCollection.travelAgent",
-                "preserveNullAndEmptyArrays": True,
-            }
-        },
-        {
-            "$unwind": {
-                "path": "$userCollection.travelAgent.agentId",
-                "preserveNullAndEmptyArrays": True,
-            }
-        },
-        {
             "$addFields": {
                 "b2bMarginTotalPricePrice": {"$subtract": ["$totalPrice", "$price"]},
                 "partnerFee": {"$multiply": ["$totalPrice", 0.1]},
@@ -1654,10 +1479,11 @@ def pipeline():
                 }
             }
         },
-        {"$addFields": {"chargebacks": {"$ifNull": ["$chargebacks", 0.0]}}},
         {
             "$addFields": {
-                "b2bMargin": {"$subtract": ["$b2bMarginPartnerFee", "$chargebacks"]}
+                "b2bMargin": {
+                    "$subtract": ["$b2bMarginPartnerFee", "$sumOfChargebacks"]
+                }
             }
         },
         {
@@ -1873,45 +1699,58 @@ def pipeline():
         {
             "$project": {
                 "totalStopsCount": 1.0,
-                "totalPrice": 1.0,
+                "totalPrice": "$totalPrice",
                 "isLite": 1.0,
                 "hasAdditionalStop": 1.0,
-                "travelDataDistance": 1.0,
                 "travelDataDuration": 1.0,
-                "createdBy": 1.0,
-                "rating1": 1.0,
+                "travelDataDistance": 1.0,
                 "passengersCount": 1.0,
                 "vehiclesCount": 1.0,
                 "additionalStopCount": 1.0,
+                "partnerId": 1.0,
+                "affiliatePartnerId": 1.0,
+                "rating1": 1.0,
                 "rating2": 1.0,
                 "rating3": 1.0,
                 "rating4": 1.0,
                 "rating5": 1.0,
-                "createdAt": 1.0,
-                "departureAt": 1.0,
-                "totalPrice": 1.0,
-                "price": 1.0,
-                "fee": 1.0,
-                "sumOfSubsidies": 1.0,
-                "discountsPrice": 1.0,
-                "discountsFee": 1.0,
-                "orderStatus": "$orderStatusString",
-                "isPool": 1.0,
-                "paymentMethod": "$paymentMethodString",
-                "currency": "$currencyString",
+                "price": "$price",
+                "fee": "$fee",
+                "discountsPrice": {
+                    "$reduce": {
+                        "input": "$discounts",
+                        "initialValue": 0.0,
+                        "in": {"$sum": ["$$value", "$$this.price"]},
+                    }
+                },
+                "discountsFee": {
+                    "$reduce": {
+                        "input": "$discounts",
+                        "initialValue": 0.0,
+                        "in": {"$sum": ["$$value", "$$this.fee"]},
+                    }
+                },
+                "pricingCountryISOCode": {"$ifNull": ["$pricingCountry.isoCode", ""]},
+                "createdAt": "$createdAt",
+                "departureAt": "$departureAt",
+                "paymentMethod": "$paymentMethod",
+                "pricingCurrency": "$pricingCurrency",
+                "originCountry": "$originCountryCollection.englishName",
+                "destinationCountry": "$destinationCountryCollection.englishName",
+                "pricingCountryName": "$pricingCountry.englishName",
                 "currencyRate": 1.0,
-                "pricingCountryName": 1.0,
-                "originCountry": 1.0,
-                "destinationCountry": 1.0,
-                "orderStatusCheck": "$status",
-                "travelAgentId": 1.0,
-                "affiliatePartnerId": 1.0,
-                "partnerId": 1.0,
-                "travelAgentApprovedAt": "$userCollection.travelAgent.approvedAt",
-                "travelAgentCreatedAt": "$userCollection.travelAgent.createdAt",
-                "route": 1.0,
-                "originLocation": 1.0,
-                "destinationLocation": 1.0,
+                "type": 1.0,
+                "userId": "$order.userId",
+                "sumOfSubsidies": 1.0,
+                "route": {
+                    "$concat": [
+                        "$originLocationCollection.name",
+                        " ",
+                        "$destinationLocationCollection.name",
+                    ]
+                },
+                "originLocation": "$originLocationCollection.name",
+                "destinationLocation": "$destinationLocationCollection.name",
                 "acceptedAt": 1.0,
                 "declinedAt": 1.0,
                 "confirmedAt": 1.0,
@@ -1932,6 +1771,7 @@ def pipeline():
                 "paymentAmount1": 1.0,
                 "paymentAmount2": 1.0,
                 "paymentAmount3": 1.0,
+                "isPaidOut": "$payments.isPaidOut",
                 "driverName0": 1.0,
                 "driverName1": 1.0,
                 "driverName2": 1.0,
@@ -1940,12 +1780,9 @@ def pipeline():
                 "driver2Company": 1.0,
                 "routeId": 1.0,
                 "sumOfChargebacks": 1.0,
-                "b2bMargin": 1.0,
-                "b2bMarginTotalPricePrice": 1.0,
-                "partnerFee": 1.0,
-                "b2bMarginPartnerFee": 1.0,
                 "vehicleYearOfManufacture0": 1.0,
                 "vehicleYearOfManufacture1": 1.0,
+                "travelAgentId": 1.0,
                 "vehicleYearOfManufacture2": 1.0,
                 "vehicleModel0": 1.0,
                 "vehicleModel1": 1.0,
@@ -1956,14 +1793,31 @@ def pipeline():
                 "isBusinessTrip": 1.0,
                 "paymentType": 1.0,
                 "driverRating": 1.0,
-                "ipAddress": 1.0,
-                "userAgent": 1.0,
-                "createdDepartureDiff": 1.0,
+                "isPool": 1.0,
+                "b2bMargin": 1.0,
+                "b2bMarginTotalPricePrice": 1.0,
+                "partnerFee": 1.0,
+                "b2bMarginPartnerFee": 1.0,
                 "userOS": 1.0,
                 "userBrowser": 1.0,
-                "userId": 1.0,
+                "createdBy": 1.0,
                 "paymentMethodB2B": 1.0,
-                "vehicleType": 1.0,
+                "orderStatusCheck": "$status",
+                "ipAddress": "$requestHeader.remoteAddress",
+                "userAgent": "$requestHeader.userAgent",
+                "requestHeaderClientName": "$requestHeader.client.name",
+                "vehicleType": "$vehiclesString",
+                "createdDepartureDiff": {
+                    "$divide": [
+                        {"$subtract": ["$departureAt", "$createdAt"]},
+                        86400000.0,
+                    ]
+                },
+                "orderStatus": "$orderStatusString",
+                "paymentMethod": "$paymentMethodString",
+                "currency": "$currencyString",
+                "travelAgentApprovedAt": "$userCollection.travelAgent.approvedAt",
+                "travelAgentCreatedAt": "$userCollection.travelAgent.createdAt",
             }
         },
     ]
