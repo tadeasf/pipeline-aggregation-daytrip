@@ -1,7 +1,7 @@
-def pipeline():
+def pipeline_no_table():
     return [
         {"$sort": {"createdAt": 1}},
-        {"$limit": 2000},
+        {"$limit": 6500},
         {
             "$lookup": {
                 "from": "discounts",
@@ -60,6 +60,22 @@ def pipeline():
         },
         {
             "$lookup": {
+                "from": "assignations",
+                "localField": "_id",
+                "foreignField": "orderId",
+                "as": "assignation",
+            }
+        },
+        {
+            "$lookup": {
+                "from": "subsidies",
+                "localField": "assignation.subsidyIds",
+                "foreignField": "_id",
+                "as": "subsidies",
+            }
+        },
+        {
+            "$lookup": {
                 "from": "users",
                 "localField": "assignation.userId",
                 "foreignField": "_id",
@@ -93,7 +109,7 @@ def pipeline():
         {
             "$lookup": {
                 "from": "countries",
-                "localField": "order.pricingCountryId",
+                "localField": "pricingCountryId",
                 "foreignField": "_id",
                 "as": "pricingCountry",
             }
@@ -135,18 +151,10 @@ def pipeline():
         },
         {
             "$lookup": {
-                "from": "assignations",
-                "localField": "_id",
-                "foreignField": "orderId",
-                "as": "assignation",
-            }
-        },
-        {
-            "$lookup": {
-                "from": "subsidies",
-                "localField": "assignation.subsidyIds",
+                "from": "users",
+                "localField": "affiliatePartnerId",
                 "foreignField": "_id",
-                "as": "subsidies",
+                "as": "partnerCollection",
             }
         },
         {
@@ -202,7 +210,7 @@ def pipeline():
                         "$filter": {
                             "input": {"$ifNull": ["$feedbacks", []]},
                             "as": "feedback",
-                            "cond": {"$eq": ["$$feedback.textScore", 1]},
+                            "cond": {"$eq": ["$$feedback.textScore", int(1)]},
                         }
                     }
                 },
@@ -211,7 +219,7 @@ def pipeline():
                         "$filter": {
                             "input": {"$ifNull": ["$feedbacks", []]},
                             "as": "feedback",
-                            "cond": {"$eq": ["$$feedback.textScore", 2]},
+                            "cond": {"$eq": ["$$feedback.textScore", int(2)]},
                         }
                     }
                 },
@@ -220,7 +228,7 @@ def pipeline():
                         "$filter": {
                             "input": {"$ifNull": ["$feedbacks", []]},
                             "as": "feedback",
-                            "cond": {"$eq": ["$$feedback.textScore", 3]},
+                            "cond": {"$eq": ["$$feedback.textScore", int(3)]},
                         }
                     }
                 },
@@ -229,7 +237,7 @@ def pipeline():
                         "$filter": {
                             "input": {"$ifNull": ["$feedbacks", []]},
                             "as": "feedback",
-                            "cond": {"$eq": ["$$feedback.textScore", 4]},
+                            "cond": {"$eq": ["$$feedback.textScore", int(4)]},
                         }
                     }
                 },
@@ -238,7 +246,7 @@ def pipeline():
                         "$filter": {
                             "input": {"$ifNull": ["$feedbacks", []]},
                             "as": "feedback",
-                            "cond": {"$eq": ["$$feedback.textScore", 5]},
+                            "cond": {"$eq": ["$$feedback.textScore", int(5)]},
                         }
                     }
                 },
@@ -821,20 +829,18 @@ def pipeline():
                 "paymentAmount3": {"$arrayElemAt": ["$paymentsFull.amount", 3.0]},
             }
         },
-        {"$addFields": {"matchedDocument": {"$arrayElemAt": ["$matchedData", 0]}}},
+        {"$addFields": {"matchedDocument": {"$arrayElemAt": ["$matchedData", int(0)]}}},
         {
             "$addFields": {
                 "travelDataDuration": "$matchedDocument.duration",
                 "travelDataDistance": "$matchedDocument.distance",
                 "customLocationsCount": {"$size": "$customLocations"},
                 "contentLocationsCount": {"$size": "$contentLocations"},
-                "totalStopsCount": {
-                    "$sum": ["$customLocationsCount", "$contentLocationsCount"]
-                },
-                "isLite": {"$in": [100, "$vehicles"]},
+                "isLite": {"$in": [int(100), "$vehicles"]},
             }
         },
         {"$unwind": {"path": "$payments", "preserveNullAndEmptyArrays": True}},
+        {"$unwind": {"path": "$partnerCollection", "preserveNullAndEmptyArrays": True}},
         {
             "$unwind": {
                 "path": "$originLocationCollection",
@@ -882,6 +888,12 @@ def pipeline():
                 "preserveNullAndEmptyArrays": True,
             }
         },
+        {
+            "$unwind": {
+                "path": "$requestHeader.userAgent",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
         {"$unwind": {"path": "$pricingCountry", "preserveNullAndEmptyArrays": True}},
         {"$unwind": {"path": "$userCollection", "preserveNullAndEmptyArrays": True}},
         {
@@ -897,6 +909,12 @@ def pipeline():
             }
         },
         {
+            "$unwind": {
+                "path": "$userCollection.travelAgent.ownerId",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
+        {
             "$addFields": {
                 "vehiclesString": {
                     "$replaceAll": {
@@ -904,7 +922,10 @@ def pipeline():
                         "find": "0",
                         "replacement": "sedan",
                     }
-                }
+                },
+                "totalStopsCount": {
+                    "$sum": ["$customLocationsCount", "$contentLocationsCount"]
+                },
             }
         },
         {
@@ -975,7 +996,7 @@ def pipeline():
                 },
                 "hasAdditionalStop": {
                     "$cond": {
-                        "if": {"$gte": ["$totalStopsCount", 1]},
+                        "if": {"$gte": ["$totalStopsCount", int(1)]},
                         "then": True,
                         "else": False,
                     }
@@ -1470,6 +1491,45 @@ def pipeline():
                 "b2bMarginTotalPricePrice": {"$subtract": ["$totalPrice", "$price"]},
                 "partnerFee": {"$multiply": ["$totalPrice", 0.1]},
                 "travelAgentId": "$userCollection.travelAgent.agentId",
+                "travelAgentOwnerId": "$userCollection.travelAgent.ownerId",
+            }
+        },
+        {
+            "$addFields": {
+                "travelAgentOwnerId": {
+                    "$switch": {
+                        "branches": [
+                            {
+                                "case": {
+                                    "$eq": [
+                                        "$travelAgentOwnerId",
+                                        "2c7d5c78-97cd-4796-a493-ca4bc68fde47",
+                                    ]
+                                },
+                                "then": "Sašenka Mamrillová",
+                            },
+                            {
+                                "case": {
+                                    "$eq": [
+                                        "$travelAgentOwnerId",
+                                        "8fe652a6-209e-4f83-b6b4-ec43c0a74c9c",
+                                    ]
+                                },
+                                "then": "Sašenka Mamrillová",
+                            },
+                            {
+                                "case": {
+                                    "$eq": [
+                                        "$travelAgentOwnerId",
+                                        "4fb118b3-f562-4a10-8b0c-3d10d9c09950",
+                                    ]
+                                },
+                                "then": "Jan Toloch",
+                            },
+                        ],
+                        "default": "$travelAgentOwnerId",
+                    }
+                }
             }
         },
         {
@@ -1483,7 +1543,8 @@ def pipeline():
             "$addFields": {
                 "b2bMargin": {
                     "$subtract": ["$b2bMarginPartnerFee", "$sumOfChargebacks"]
-                }
+                },
+                "userAgent": "$requestHeader.userAgent",
             }
         },
         {
@@ -1699,6 +1760,7 @@ def pipeline():
         {
             "$project": {
                 "totalStopsCount": 1.0,
+                "customerNote": "$partnerCollection.customerNote",
                 "totalPrice": "$totalPrice",
                 "isLite": 1.0,
                 "hasAdditionalStop": 1.0,
@@ -1709,6 +1771,7 @@ def pipeline():
                 "additionalStopCount": 1.0,
                 "partnerId": 1.0,
                 "affiliatePartnerId": 1.0,
+                "travelAgentOwnerId": 1.0,
                 "rating1": 1.0,
                 "rating2": 1.0,
                 "rating3": 1.0,
@@ -1804,7 +1867,7 @@ def pipeline():
                 "paymentMethodB2B": 1.0,
                 "orderStatusCheck": "$status",
                 "ipAddress": "$requestHeader.remoteAddress",
-                "userAgent": "$requestHeader.userAgent",
+                "userAgent": 1.0,
                 "requestHeaderClientName": "$requestHeader.client.name",
                 "vehicleType": "$vehiclesString",
                 "createdDepartureDiff": {
@@ -1814,7 +1877,6 @@ def pipeline():
                     ]
                 },
                 "orderStatus": "$orderStatusString",
-                "paymentMethod": "$paymentMethodString",
                 "currency": "$currencyString",
                 "travelAgentApprovedAt": "$userCollection.travelAgent.approvedAt",
                 "travelAgentCreatedAt": "$userCollection.travelAgent.createdAt",

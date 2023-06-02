@@ -1,4 +1,4 @@
-def pipeline():
+def pipeline_no_table():
     return [
         {"$sort": {"createdAt": 1}},
         {"$limit": 2000.0},
@@ -694,6 +694,12 @@ def pipeline():
         },
         {
             "$unwind": {
+                "path": "$userCollection.travelAgent.ownerId",
+                "preserveNullAndEmptyArrays": True,
+            }
+        },
+        {
+            "$unwind": {
                 "path": "$userCollection.travelAgent.approvedAt",
                 "preserveNullAndEmptyArrays": True,
             }
@@ -937,6 +943,45 @@ def pipeline():
                         None,
                     ]
                 },
+                "travelAgentOwnerId": "$userCollection.travelAgent.ownerId",
+            }
+        },
+        {
+            "$addFields": {
+                "travelAgentOwnerId": {
+                    "$switch": {
+                        "branches": [
+                            {
+                                "case": {
+                                    "$eq": [
+                                        "$travelAgentOwnerId",
+                                        "2c7d5c78-97cd-4796-a493-ca4bc68fde47",
+                                    ]
+                                },
+                                "then": "Sašenka Mamrillová",
+                            },
+                            {
+                                "case": {
+                                    "$eq": [
+                                        "$travelAgentOwnerId",
+                                        "8fe652a6-209e-4f83-b6b4-ec43c0a74c9c",
+                                    ]
+                                },
+                                "then": "Sašenka Mamrillová",
+                            },
+                            {
+                                "case": {
+                                    "$eq": [
+                                        "$travelAgentOwnerId",
+                                        "4fb118b3-f562-4a10-8b0c-3d10d9c09950",
+                                    ]
+                                },
+                                "then": "Jan Toloch",
+                            },
+                        ],
+                        "default": "$travelAgentOwnerId",
+                    }
+                }
             }
         },
         {
@@ -987,6 +1032,7 @@ def pipeline():
         {
             "$project": {
                 "vehicles": "$vehicleTypesPricesFees.vehicleType",
+                "travelAgentOwnerId": 1.0,
                 "isLite": 1.0,
                 "hasAdditionalStop": 1.0,
                 "travelDataDuration": 1.0,
@@ -1114,6 +1160,7 @@ def pipeline():
             "$project": {
                 "vehicles": 1.0,
                 "isLite": 1.0,
+                "travelAgentOwnerId": 1.0,
                 "hasAdditionalStop": 1.0,
                 "travelDataDuration": 1.0,
                 "travelDataDistance": 1.0,
@@ -1875,6 +1922,7 @@ def pipeline():
             "$project": {
                 "vehicles": 1.0,
                 "isLite": 1.0,
+                "travelAgentOwnerId": 1.0,
                 "hasAdditionalStop": 1.0,
                 "travelDataDuration": 1.0,
                 "travelDataDistance": 1.0,
